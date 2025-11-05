@@ -4,6 +4,7 @@
 import React from 'react';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { useMQTT } from '@/hooks/use-mqtt';
 
 const query_client = new QueryClient({
   defaultOptions: {
@@ -21,6 +22,7 @@ interface ProvidersProps {
 }
 
 export function Providers({ children }: ProvidersProps) {
+  useMQTT();
   return (
     <QueryClientProvider client={query_client}>
       {children}

@@ -3,7 +3,6 @@
 import React from 'react';
 import { usePlacingPoints } from '@/hooks/use-placing-points';
 import { get_placing_point_color } from '@/lib/utils/helpers';
-import { Badge } from '@/components/ui/badge';
 
 export function PlacingPointsGrid() {
   const { outer_points, inner_points } = usePlacingPoints();
@@ -13,7 +12,7 @@ export function PlacingPointsGrid() {
   return (
     <div className="grid grid-cols-2 gap-8">
       <div>
-        <h3 className="font-semibold mb-3 text-lg">Outer Conveyor (O1-O10)</h3>
+        <h3 className="font-semibold mb-3 text-lg">Outer Conveyor (O1-O5)</h3>
         <div className="grid grid-cols-5 gap-2">
           {outer_points.map((point) => (
             <div
@@ -29,7 +28,7 @@ export function PlacingPointsGrid() {
           ))}
         </div>
         <div>
-          <h3 className="font-semibold mb-3 text-lg">Inner Conveyor (I1-I10)</h3>
+          <h3 className="font-semibold mb-3 text-lg">Inner Conveyor (I1-I5)</h3>
           <div className="grid grid-cols-5 gap-2">
             {inner_points.map((point) => (
               <div
