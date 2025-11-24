@@ -2,7 +2,7 @@
 
 export const APP_CONFIG = {
   // MQTT Configuration based on NODE_ENV
-  MQTT_BROKER_PROD: 'wss://broker.iot.hmmitb.com:8884',
+  MQTT_BROKER_PROD: 'wss://broker.iot.hmmitb.com',
   MQTT_BROKER_DEV: 'ws://broker.iot.hmmitb.com:1884',
   MQTT_QOS: 1 as const,
   MQTT_KEEP_ALIVE: 60,
