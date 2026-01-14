@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import { subscribeWithSelector } from 'zustand/middleware';
 // Pastikan sendCommand ada di actions.ts, kalau error comment dulu baris ini & bagian toggle_actuator
-import { sendCommand } from '@/app/actions'; 
+// import { sendCommand } from '@/app/actions'; 
 
 // Definisi Tipe
 export type SystemMode = 'manual' | 'automatic' | 'off';
@@ -31,6 +31,10 @@ interface SystemStoreState {
   set_last_mqtt_update: (timestamp: string) => void;
   set_error_message: (message: string | null) => void;
   reset_error: () => void;
+  
+  // New Online Status
+  mqtt_online_status: number;
+  set_mqtt_online_status: (status: number) => void;
 }
 
 export const useSystemStore = create<SystemStoreState>()(
@@ -42,6 +46,7 @@ export const useSystemStore = create<SystemStoreState>()(
     mqtt_connected: false,
     last_mqtt_update: null,
     error_message: null,
+    mqtt_online_status: 0,
 
     // --- IMPLEMENTASI CONTROL ---
     set_mode: (mode) => set({ mode }),
@@ -54,6 +59,8 @@ export const useSystemStore = create<SystemStoreState>()(
 
     toggle_actuator: async (part, action) => {
       // Logic kirim database (Opsional, kalau sendCommand belum siap bisa dikosongin dulu)
+      /* 
+      // LEGACY CODE - REMOVED
       try {
         let updates = {};
         if (part === 'LA1') {
@@ -65,6 +72,8 @@ export const useSystemStore = create<SystemStoreState>()(
       } catch (e) {
         console.error("Gagal toggle actuator:", e);
       }
+      */
+     console.warn('toggle_actuator is deprecated');
     },
 
     // --- IMPLEMENTASI MQTT (RESTORED) ---
@@ -76,5 +85,8 @@ export const useSystemStore = create<SystemStoreState>()(
     set_error_message: (message) => set({ error_message: message }),
     
     reset_error: () => set({ error_message: null }),
+
+    // New Online Status
+    set_mqtt_online_status: (status) => set({ mqtt_online_status: status }),
   }))
 );

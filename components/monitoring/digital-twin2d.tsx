@@ -1,11 +1,21 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-
-// Kita tidak butuh import Store lama lagi karena data datang dari Props 'data'
-// import { useConveyorStore } from '@/store/conveyor-store'; ... (HAPUS)
+import { usePlcStore } from '@/store/plc-store';
+import { useSensorStore } from '@/store/sensor-store';
+import { useActuatorStore } from '@/store/actuator-store';
+import { useConveyorStore } from '@/store/conveyor-store';
 
 export function DigitalTwin2D({ data }: { data: any }) {
+  // Use PLC Store for Points (Real-time MQTT fallback)
+  const outer_points_store = usePlcStore((s) => s.outer_points);
+  const inner_points_store = usePlcStore((s) => s.inner_points);
+
+  // Real-time Stores
+  const sensor_store = useSensorStore();
+  const actuator_store = useActuatorStore();
+  const conveyor_store = useConveyorStore();
+
   // 1. Loading State
   if (!data) {
     return (
@@ -19,35 +29,37 @@ export function DigitalTwin2D({ data }: { data: any }) {
   }
 
   // 2. LOGIKA ANIMASI ROTASI (Hybrid System)
-  // Kita hitung rotasi lokal berdasarkan RPM dari database biar mulus
   const [visualOuterAngle, setVisualOuterAngle] = useState(0);
   const [visualInnerAngle, setVisualInnerAngle] = useState(0);
   const lastTimeRef = useRef<number>(0);
   const requestRef = useRef<number>(0);
 
-  // ... kode sebelumnya (state visualOuterAngle, dll)
+  // Data Mapping (Prioritize Store > DB Data)
+  // Use is_running from conveyor store for logic
+  const outerRunning = conveyor_store.outer_conveyor.is_running;
+  const innerRunning = conveyor_store.inner_conveyor.is_running;
 
-  // --- TAMBAHAN BARU: SYNC POSISI SAAT DIAM ---
+  const outerSpeedVal = sensor_store.motor_speed ?? data.motorSpeedSensor ?? 0;
+
+  // Logic: If running, use speed val (or default 60), else 0
+  const outerRpm = outerRunning ? (outerSpeedVal > 0 ? outerSpeedVal : 60) : 0;
+
+  // Inner uses a similar logic, assuming we might get a speed or default
+  const innerRpmVal = data.stepperSpeedSetting || 0;
+  const innerRpm = innerRunning ? (innerRpmVal > 0 ? innerRpmVal : 60) : 0;
+
+  // --- SYNC POSISI SAAT DIAM ---
   useEffect(() => {
-    // Kalau motor berhenti (RPM 0), paksa visual ikut posisi Database
-    if (data.stepper1Rpm === 0) {
-      setVisualOuterAngle(data.stepper1Position || 0);
-    }
-    
-    if (data.stepper2Rpm === 0) {
-      setVisualInnerAngle(data.stepper2Position || 0);
-    }
-  }, [data.stepper1Rpm, data.stepper1Position, data.stepper2Rpm, data.stepper2Position]);
-
-  // ... lanjut ke const animate ...
+    if (outerRpm === 0) setVisualOuterAngle(0); // Reset or use position if available (schema doesn't have pos)
+    if (innerRpm === 0) setVisualInnerAngle(0);
+  }, [outerRpm, innerRpm]);
 
   const animate = (time: number) => {
     if (lastTimeRef.current !== undefined) {
       const deltaTime = (time - lastTimeRef.current) / 1000;
       
-      // Rumus: RPM * 6 = Derajat per detik
-      const outerSpeedDeg = (data.stepper1Rpm || 0) * 6;
-      const innerSpeedDeg = (data.stepper2Rpm || 0) * 6;
+      const outerSpeedDeg = outerRpm * 6;
+      const innerSpeedDeg = innerRpm * 6;
 
       if (outerSpeedDeg > 0 || innerSpeedDeg > 0) {
         setVisualOuterAngle((prev) => (prev + outerSpeedDeg * deltaTime) % 360);
@@ -61,31 +73,36 @@ export function DigitalTwin2D({ data }: { data: any }) {
   useEffect(() => {
     requestRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(requestRef.current!);
-  }, [data.stepper1Rpm, data.stepper2Rpm]);
-
+  }, [outerRpm, innerRpm]);
 
   // 3. PREPARE DATA (Mapping dari DB ke Visual)
-  const relay_actuator_1 = data.la1Forward;
-  const relay_actuator_2 = data.la2Forward;
-  const relay_ir = data.irRelay;
-  const relay_inductive = data.inductiveRelay;
-  const relay_capacitive = data.capacitiveRelay;
+  // Real-time Actuators
+  const relay_actuator_1 = actuator_store.dl_actuator.push || data.dlPush;
+  const relay_actuator_2 = actuator_store.ld_actuator.push || data.ldPush;
 
-  const outer_points = [
-    { id: 1, state: data.outerPoint1 || 'empty' },
-    { id: 2, state: data.outerPoint2 || 'empty' },
-    { id: 3, state: data.outerPoint3 || 'empty' },
-    { id: 4, state: data.outerPoint4 || 'empty' },
-    { id: 5, state: data.outerPoint5 || 'empty' },
-  ];
+  // Real-time Sensors
+  const relay_ir = sensor_store.ir_sensor.state || data.irSensor;
+  const relay_inductive = sensor_store.inductive_sensor.state || data.inductiveSensor;
+  const relay_capacitive = sensor_store.capacitive_sensor.state || data.capacitiveSensor;
 
-  const inner_points = [
-    { id: 1, state: data.innerPoint1Occupied ? 'occupied' : 'empty' },
-    { id: 2, state: data.innerPoint2Occupied ? 'occupied' : 'empty' },
-    { id: 3, state: data.innerPoint3Occupied ? 'occupied' : 'empty' },
-    { id: 4, state: data.innerPoint4Occupied ? 'occupied' : 'empty' },
-    { id: 5, state: data.innerPoint5Occupied ? 'occupied' : 'empty' },
-  ];
+  // Map Store Points to Visual Array
+  const outer_points = [1, 2, 3, 4, 5].map(id => {
+    const pt = outer_points_store[`O${id}` as any];
+    const stateVal = pt?.state || 'non-occupied';
+    return {
+      id,
+      state: stateVal === 'non-occupied' ? 'empty' : (stateVal === 'occupied-metallic' ? 'occupied_metallic' : 'occupied')
+    };
+  });
+
+  const inner_points = [1, 2, 3, 4, 5].map(id => {
+    const pt = inner_points_store[`I${id}` as any];
+    const stateVal = pt?.state || 'non-occupied';
+    return {
+      id,
+      state: stateVal === 'non-occupied' ? 'empty' : 'occupied'
+    };
+  });
 
   // Constants
   const LA_LENGTH = 80;
@@ -147,7 +164,7 @@ export function DigitalTwin2D({ data }: { data: any }) {
 
           {/* --- ACTUATORS & SENSORS (ANIMATED) --- */}
 
-          {/* Linear Actuator 1 */}
+          {/* Linear Actuator 1 (DL) */}
           <g>
             <rect x={CENTER_X - OUTER_RADIUS - LA_LENGTH / 2} y={CENTER_Y - 8} width={LA_LENGTH} height={16} fill={relay_actuator_1 ? '#7c3aed' : '#9ca3af'} stroke={relay_actuator_1 ? '#5b21b6' : '#6b7280'} strokeWidth="3" rx="4" />
             <rect x={relay_actuator_1 ? (CENTER_X - OUTER_RADIUS + 10) : (CENTER_X - OUTER_RADIUS - LA_LENGTH / 2 + 10)} y={CENTER_Y - 12} width={24} height={24} fill={relay_actuator_1 ? '#c4b5fd' : '#d1d5db'} stroke={relay_actuator_1 ? '#5b21b6' : '#6b7280'} strokeWidth="3" rx="3">
@@ -160,10 +177,7 @@ export function DigitalTwin2D({ data }: { data: any }) {
           <g>
             <rect x={CENTER_X - OUTER_RADIUS - 15} y={CENTER_Y - 9} width={30} height={18} fill={relay_inductive ? '#3b82f6' : '#bfdbfe'} stroke="#1e3a8a" strokeWidth="2" rx="3" />
             {relay_inductive && (
-              <>
-                <circle cx={CENTER_X - OUTER_RADIUS} cy={CENTER_Y} r="4" fill="#60a5fa" opacity="0.8"><animate attributeName="opacity" values="0.8;0.3;0.8" dur="0.8s" repeatCount="indefinite" /></circle>
-                <line x1={CENTER_X - OUTER_RADIUS + 15} y1={CENTER_Y} x2={CENTER_X - OUTER_RADIUS + 35} y2={CENTER_Y} stroke="#3b82f6" strokeWidth="2" strokeDasharray="2,2"><animate attributeName="x2" values={`${CENTER_X - OUTER_RADIUS + 15};${CENTER_X - OUTER_RADIUS + 35};${CENTER_X - OUTER_RADIUS + 15}`} dur="1s" repeatCount="indefinite" /></line>
-              </>
+              <circle cx={CENTER_X - OUTER_RADIUS + 15} cy={CENTER_Y} r="4" fill="#60a5fa" opacity="0.8"><animate attributeName="opacity" values="0.8;0.3;0.8" dur="0.8s" repeatCount="indefinite" /></circle>
             )}
             <text x={CENTER_X - OUTER_RADIUS - 35} y={CENTER_Y + 25} textAnchor="middle" className="text-[11px] fill-current font-bold">IP</text>
           </g>
@@ -175,7 +189,7 @@ export function DigitalTwin2D({ data }: { data: any }) {
             <text x={CENTER_X + OUTER_RADIUS * Math.cos((210 * Math.PI) / 180) - 70} y={CENTER_Y + OUTER_RADIUS * Math.sin((210 * Math.PI) / 180) + 10} textAnchor="middle" className="text-[11px] fill-current font-bold">IR</text>
           </g>
 
-          {/* Linear Actuator 2 */}
+          {/* Linear Actuator 2 (LD) */}
           <g>
             <rect x={CENTER_X + INNER_RADIUS - LA_LENGTH / 2} y={CENTER_Y - 8} width={LA_LENGTH} height={16} fill={relay_actuator_2 ? '#7c3aed' : '#9ca3af'} stroke={relay_actuator_2 ? '#5b21b6' : '#6b7280'} strokeWidth="3" rx="4" />
             <rect x={relay_actuator_2 ? (CENTER_X + INNER_RADIUS + 10) : (CENTER_X + INNER_RADIUS - LA_LENGTH / 2 + 10)} y={CENTER_Y - 12} width={24} height={24} fill={relay_actuator_2 ? '#c4b5fd' : '#d1d5db'} stroke={relay_actuator_2 ? '#5b21b6' : '#6b7280'} strokeWidth="3" rx="3">
@@ -188,20 +202,17 @@ export function DigitalTwin2D({ data }: { data: any }) {
           <g>
             <rect x={CENTER_X + INNER_RADIUS - 15} y={CENTER_Y - 9} width={30} height={18} fill={relay_capacitive ? '#eab308' : '#fef08a'} stroke="#713f12" strokeWidth="2" rx="3" />
             {relay_capacitive && (
-              <>
-                <circle cx={CENTER_X + INNER_RADIUS} cy={CENTER_Y} r="4" fill="#facc15" opacity="0.8"><animate attributeName="opacity" values="0.8;0.3;0.8" dur="0.8s" repeatCount="indefinite" /></circle>
-                <line x1={CENTER_X + INNER_RADIUS - 35} y1={CENTER_Y} x2={CENTER_X + INNER_RADIUS - 15} y2={CENTER_Y} stroke="#eab308" strokeWidth="2" strokeDasharray="2,2"><animate attributeName="x2" values={`${CENTER_X + INNER_RADIUS - 15};${CENTER_X + INNER_RADIUS - 35};${CENTER_X + INNER_RADIUS - 15}`} dur="1s" repeatCount="indefinite" /></line>
-              </>
+              <circle cx={CENTER_X + INNER_RADIUS} cy={CENTER_Y} r="4" fill="#facc15" opacity="0.8"><animate attributeName="opacity" values="0.8;0.3;0.8" dur="0.8s" repeatCount="indefinite" /></circle>
             )}
             <text x={CENTER_X + INNER_RADIUS + 35} y={CENTER_Y + 25} textAnchor="middle" className="text-[11px] fill-current font-bold">CP</text>
           </g>
 
           {/* Text Info */}
           <text x={CENTER_X} y="30" textAnchor="middle" className="text-base fill-blue-600 dark:fill-blue-400 font-bold">
-            Outer: {data.stepper1Rpm?.toFixed(1)} RPM
+            Outer: {outerRpm.toFixed(1)} Unit/s
           </text>
           <text x={CENTER_X} y="485" textAnchor="middle" className="text-base fill-green-600 dark:fill-green-400 font-bold">
-            Inner: {data.stepper2Rpm?.toFixed(1)} RPM
+            Inner: {innerRpm.toFixed(1)} Level
           </text>
         </svg>
       </div>

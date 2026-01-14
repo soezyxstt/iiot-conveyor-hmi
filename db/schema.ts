@@ -1,97 +1,74 @@
-// src/db/schema.ts
 import { 
   pgTable, 
   serial, 
   boolean, 
-  real, 
+  integer, 
   timestamp, 
-  pgEnum,
   index 
 } from "drizzle-orm/pg-core";
 
-// Enums for non-binary states to ensure data integrity
-export const pointStateEnum = pgEnum("point_state", ["empty", "occupied", "occupied_metallic"]);
-export const motorIdEnum = pgEnum("motor_identifier", ["stepper_1", "stepper_2"]);
-
 // ----------------------------------------------------------------------
-// TABLE 1: HIGH FREQUENCY TELEMETRY
-// Stores the snapshot of the machine state. 
-// Optimized for heavy writes and time-range reads.
+// TABLE: CONVEYOR TELEMETRY
+// Strictly mapped to the ITB/IIOT/conveyor MQTT topics 
 // ----------------------------------------------------------------------
-export const machineLogs = pgTable("machine_logs", {
+export const conveyorLogs = pgTable("conveyor_logs", {
   id: serial("id").primaryKey(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 
-  // Linear Actuators (Relay States)
-  la1Forward: boolean("la1_forward").notNull(),
-  la1Backward: boolean("la1_backward").notNull(),
-  la2Forward: boolean("la2_forward").notNull(),
-  la2Backward: boolean("la2_backward").notNull(),
+  // -- SENSORS (Boolean / W Bits) --
+  // Topic: ITB/IIOT/conveyor/sensor/ir/state
+  irSensor: boolean("ir_sensor").default(false),
+  
+  // Topic: ITB/IIOT/conveyor/sensor/inductive/state
+  inductiveSensor: boolean("inductive_sensor").default(false),
+  
+  // Topic: ITB/IIOT/conveyor/sensor/capacitive/state
+  capacitiveSensor: boolean("capacitive_sensor").default(false),
+  
+  // Topic: ITB/IIOT/conveyor/sensor/position_inner/state
+  positionInnerSensor: boolean("position_inner_sensor").default(false),
+  
+  // Topic: ITB/IIOT/conveyor/sensor/position_outer/state
+  positionOuterSensor: boolean("position_outer_sensor").default(false),
 
-  // Stepper Motor Control (Relay States)
-  stepper1Relay: boolean("stepper1_relay").notNull(),
-  stepper2Relay: boolean("stepper2_relay").notNull(),
+  // -- SENSORS (Data / D Registers) --
+  // Topic: ITB/IIOT/conveyor/sensor/motor_speed/state (Address: D10)
+  motorSpeedSensor: integer("motor_speed_sensor").default(0),
 
-  // Proximity Sensor Relays (Active/Inactive)
-  irRelay: boolean("ir_relay").notNull(),
-  inductiveRelay: boolean("inductive_relay").notNull(),
-  capacitiveRelay: boolean("capacitive_relay").notNull(),
+  // Topic: ITB/IIOT/conveyor/sensor/object_inner/state (Address: D120)
+  objectInnerCount: integer("object_inner_count").default(0),
 
-  // Sensor Inputs (Detected/Not Detected)
-  irSensor: boolean("ir_sensor").notNull(),
-  inductiveSensor: boolean("inductive_sensor").notNull(),
-  capacitiveSensor: boolean("capacitive_sensor").notNull(),
+  // Topic: ITB/IIOT/conveyor/sensor/object_outer/state (Address: D130)
+  objectOuterCount: integer("object_outer_count").default(0),
 
-  // Stepper Feedback (Numeric)
-  // Using 'real' (float4) to map PLC floating point values for RPM/Angle
-  stepper1Rpm: real("stepper1_rpm").notNull(),
-  stepper1Position: real("stepper1_pos").notNull(), 
-  stepper2Rpm: real("stepper2_rpm").notNull(),
-  stepper2Position: real("stepper2_pos").notNull(),
+  // -- ACTUATORS & FEEDBACK (Boolean / W Bits) --
+  // Note: MQTT topics exist for both 'actuator' and 'feedback', but they map 
+  // to the same PLC addresses (e.g., W5.00). We store the consolidated state here.
 
-  // System Health
-  isPowerLive: boolean("is_power_live").notNull(),
+  // Topic: .../actuator/DL/push (Address: W5.00)
+  dlPush: boolean("dl_push").default(false),
 
-  // Outer Points (Complex State)
-  outerPoint1: pointStateEnum("outer_point_1").notNull(),
-  outerPoint2: pointStateEnum("outer_point_2").notNull(),
-  outerPoint3: pointStateEnum("outer_point_3").notNull(),
-  outerPoint4: pointStateEnum("outer_point_4").notNull(),
-  outerPoint5: pointStateEnum("outer_point_5").notNull(),
+  // Topic: .../actuator/OL/pull (Address: W5.01) -> Renamed to dl_pull to match pairing
+  dlPull: boolean("dl_pull").default(false),
 
-  // Inner Points (Binary State: Empty/Occupied)
-  innerPoint1Occupied: boolean("inner_point_1_occupied").notNull(),
-  innerPoint2Occupied: boolean("inner_point_2_occupied").notNull(),
-  innerPoint3Occupied: boolean("inner_point_3_occupied").notNull(),
-  innerPoint4Occupied: boolean("inner_point_4_occupied").notNull(),
-  innerPoint5Occupied: boolean("inner_point_5_occupied").notNull(),
+  // Topic: .../actuator/LD/push (Address: W5.02)
+  ldPush: boolean("ld_push").default(false),
+
+  // Topic: .../actuator/LD/pull (Address: W5.03)
+  ldPull: boolean("ld_pull").default(false),
+
+  // Topic: .../actuator/stepper/inner (Address: W5.04)
+  stepperInnerRotate: boolean("stepper_inner_rotate").default(false),
+
+  // Topic: .../actuator/stepper/outer (Address: W5.05)
+  stepperOuterRotate: boolean("stepper_outer_rotate").default(false),
+
+  // Topic: .../actuator/stepper/speed (Address: D2)
+  stepperSpeedSetting: integer("stepper_speed_setting").default(0),
 
 }, (table) => {
   return {
-    // BRIN or B-Tree index essential for time-series range queries
+    // Index for fast time-range querying (e.g., graphing sensor data over time)
     createdAtIndex: index("created_at_idx").on(table.createdAt),
-  };
-});
-
-// ----------------------------------------------------------------------
-// TABLE 2: DRIFT CALIBRATION LOGS
-// Event-driven table. Only populated when a prox switch reset occurs.
-// ----------------------------------------------------------------------
-export const stepperDriftLogs = pgTable("stepper_drift_logs", {
-  id: serial("id").primaryKey(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  
-  motorId: motorIdEnum("motor_id").notNull(),
-  
-  // The theoretical position the PLC calculated before physical reset
-  commandedPosition: real("commanded_position").notNull(),
-  
-  // The delta (commanded - actual/zero)
-  driftValue: real("drift_value").notNull(),
-
-}, (table) => {
-  return {
-    // Composite index might be useful here if querying drift by motor over time often
-    motorTimeIdx: index("motor_time_idx").on(table.motorId, table.createdAt),
   };
 });

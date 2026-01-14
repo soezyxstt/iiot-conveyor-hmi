@@ -22,48 +22,28 @@ interface FieldConfig {
 }
 
 const ALL_FIELDS: FieldConfig[] = [
-  // --- MOTORS (Numeric) ---
-  { key: 'stepper1Rpm', label: 'Stp 1 RPM', type: 'number', color: '#2563eb' },
-  { key: 'stepper1Position', label: 'Stp 1 Pos', type: 'number', color: '#60a5fa' },
-  { key: 'stepper2Rpm', label: 'Stp 2 RPM', type: 'number', color: '#7c3aed' },
-  { key: 'stepper2Position', label: 'Stp 2 Pos', type: 'number', color: '#a78bfa' },
+  // --- SENSORS (Boolean) ---
+  { key: 'irSensor', label: 'IR Sensor', type: 'boolean', color: '#c2410c' },
+  { key: 'inductiveSensor', label: 'Inductive', type: 'boolean', color: '#be185d' },
+  { key: 'capacitiveSensor', label: 'Capacitive', type: 'boolean', color: '#a16207' },
+  { key: 'positionInnerSensor', label: 'Pos Inner', type: 'boolean', color: '#166534' },
+  { key: 'positionOuterSensor', label: 'Pos Outer', type: 'boolean', color: '#15803d' },
 
-  // --- ACTUATORS (Relay States) ---
-  { key: 'la1Forward', label: 'LA1 Fwd', type: 'boolean', color: '#16a34a' },
-  { key: 'la1Backward', label: 'LA1 Bwd', type: 'boolean', color: '#dc2626' },
-  { key: 'la2Forward', label: 'LA2 Fwd', type: 'boolean', color: '#16a34a' },
-  { key: 'la2Backward', label: 'LA2 Bwd', type: 'boolean', color: '#dc2626' },
+  // --- SENSORS (Numeric) ---
+  { key: 'motorSpeedSensor', label: 'Motor Speed', type: 'number', color: '#2563eb' },
+  { key: 'objectInnerCount', label: 'Count Inn', type: 'number', color: '#7c3aed' },
+  { key: 'objectOuterCount', label: 'Count Out', type: 'number', color: '#a78bfa' },
 
-  // --- MOTOR RELAYS ---
-  { key: 'stepper1Relay', label: 'Relay Stp1', type: 'boolean', color: '#3b82f6' },
-  { key: 'stepper2Relay', label: 'Relay Stp2', type: 'boolean', color: '#8b5cf6' },
+  // --- ACTUATORS (DL/LD) ---
+  { key: 'dlPush', label: 'DL Push', type: 'boolean', color: '#16a34a' },
+  { key: 'dlPull', label: 'DL Pull', type: 'boolean', color: '#dc2626' },
+  { key: 'ldPush', label: 'LD Push', type: 'boolean', color: '#16a34a' },
+  { key: 'ldPull', label: 'LD Pull', type: 'boolean', color: '#dc2626' },
 
-  // --- SENSOR RELAYS ---
-  { key: 'irRelay', label: 'Relay IR', type: 'boolean', color: '#f97316' },
-  { key: 'inductiveRelay', label: 'Relay Induc', type: 'boolean', color: '#ec4899' },
-  { key: 'capacitiveRelay', label: 'Relay Cap', type: 'boolean', color: '#eab308' },
-
-  // --- SENSOR INPUTS ---
-  { key: 'irSensor', label: 'IR Input', type: 'boolean', color: '#c2410c' },
-  { key: 'inductiveSensor', label: 'Induc Input', type: 'boolean', color: '#be185d' },
-  { key: 'capacitiveSensor', label: 'Cap Input', type: 'boolean', color: '#a16207' },
-
-  // --- SYSTEM ---
-  { key: 'isPowerLive', label: 'Power', type: 'boolean', color: '#000000' },
-
-  // --- OUTER POINTS (Enum) ---
-  { key: 'outerPoint1', label: 'Out Pt 1', type: 'enum', color: '#4b5563' },
-  { key: 'outerPoint2', label: 'Out Pt 2', type: 'enum', color: '#4b5563' },
-  { key: 'outerPoint3', label: 'Out Pt 3', type: 'enum', color: '#4b5563' },
-  { key: 'outerPoint4', label: 'Out Pt 4', type: 'enum', color: '#4b5563' },
-  { key: 'outerPoint5', label: 'Out Pt 5', type: 'enum', color: '#4b5563' },
-
-  // --- INNER POINTS (Boolean) ---
-  { key: 'innerPoint1Occupied', label: 'Inn Pt 1', type: 'boolean', color: '#9ca3af' },
-  { key: 'innerPoint2Occupied', label: 'Inn Pt 2', type: 'boolean', color: '#9ca3af' },
-  { key: 'innerPoint3Occupied', label: 'Inn Pt 3', type: 'boolean', color: '#9ca3af' },
-  { key: 'innerPoint4Occupied', label: 'Inn Pt 4', type: 'boolean', color: '#9ca3af' },
-  { key: 'innerPoint5Occupied', label: 'Inn Pt 5', type: 'boolean', color: '#9ca3af' },
+  // --- STEPPERS ---
+  { key: 'stepperInnerRotate', label: 'Stp Inner', type: 'boolean', color: '#3b82f6' },
+  { key: 'stepperOuterRotate', label: 'Stp Outer', type: 'boolean', color: '#8b5cf6' },
+  { key: 'stepperSpeedSetting', label: 'Stp Speed', type: 'number', color: '#0ea5e9' },
 ];
 
 export function DatabaseTab() {
@@ -74,8 +54,8 @@ export function DatabaseTab() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   
-  // Default selected: RPM dan Power aja biar grafik gak pusing
-  const [selectedFields, setSelectedFields] = useState<string[]>(['stepper1Rpm', 'isPowerLive']);
+  // Default selected: Motor Speed and Counts
+  const [selectedFields, setSelectedFields] = useState<string[]>(['motorSpeedSensor', 'objectInnerCount']);
 
   // --- FETCH DATA LOGIC ---
   const handleSearch = async () => {
@@ -86,7 +66,7 @@ export function DatabaseTab() {
       const start = new Date(startDate);
       const end = new Date(endDate);
       
-      // Cuma panggil Machine Logs
+      // Cuma panggil Logs biasa
       const rawData = await getFilteredLogs(start, end);
 
       // PRE-PROCESSING
@@ -96,17 +76,14 @@ export function DatabaseTab() {
         // 1. Format Waktu
         newItem.timeStr = new Date(item.createdAt).toLocaleTimeString('en-GB');
 
-        // 2. Convert Boolean/Enum -> Number (Untuk Grafik)
+        // 2. Convert Boolean -> Number (Untuk Grafik)
         ALL_FIELDS.forEach(field => {
           const val = item[field.key];
           
           if (field.type === 'boolean') {
             newItem[field.key] = val ? 1 : 0;
-          } else if (field.type === 'enum') {
-            // Mapping Enum ke Angka
-            const map: Record<string, number> = { 'empty': 0, 'occupied': 1, 'occupied_metallic': 2 };
-            newItem[field.key] = map[val as string] || 0;
-          }
+          } 
+          // Enum removed from ALL_FIELDS
         });
 
         return newItem;

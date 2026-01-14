@@ -2,27 +2,35 @@
 
 import React from 'react';
 import { StatusIndicator } from '@/components/common/status-indicator';
+import { useActuatorStore } from '@/store/actuator-store';
+import { useConveyorStore } from '@/store/conveyor-store';
+import { useSensorStore } from '@/store/sensor-store';
 
 // Kita terima data dari parent (MonitoringTab)
 export function RelayStatus({ data }: { data: any }) {
-  
-  // Kita buat mapping manual agar data boolean dari Database
-  // bisa diloop seperti struktur array yang lama.
+
+  const actuator_store = useActuatorStore();
+  const conveyor_store = useConveyorStore();
+  const sensor_store = useSensorStore();
+
+  // Create relay list merging Real-time Store (Priority) with DB Data (Fallback)
   const relayList = [
-    // Linear Actuators
-    { name: 'LA1 Forward', active: data.la1Forward },
-    { name: 'LA1 Backward', active: data.la1Backward },
-    { name: 'LA2 Forward', active: data.la2Forward },
-    { name: 'LA2 Backward', active: data.la2Backward },
+    // Actuators (DL/LD)
+    { name: 'DL Push', active: actuator_store.dl_actuator.push ?? data.dlPush },
+    { name: 'DL Pull', active: actuator_store.dl_actuator.pull ?? data.dlPull },
+    { name: 'LD Push', active: actuator_store.ld_actuator.push ?? data.ldPush },
+    { name: 'LD Pull', active: actuator_store.ld_actuator.pull ?? data.ldPull },
     
     // Steppers
-    { name: 'Stepper 1 Relay', active: data.stepper1Relay },
-    { name: 'Stepper 2 Relay', active: data.stepper2Relay },
+    { name: 'Stepper Inner', active: conveyor_store.inner_conveyor.is_running ?? data.stepperInnerRotate },
+    { name: 'Stepper Outer', active: conveyor_store.outer_conveyor.is_running ?? data.stepperOuterRotate },
     
-    // Proximity/Sensor Relays
-    { name: 'IR Relay', active: data.irRelay },
-    { name: 'Inductive Relay', active: data.inductiveRelay },
-    { name: 'Capacitive Relay', active: data.capacitiveRelay },
+    // Sensors
+    { name: 'IR Sensor', active: sensor_store.ir_sensor.state ?? data.irSensor },
+    { name: 'Inductive', active: sensor_store.inductive_sensor.state ?? data.inductiveSensor },
+    { name: 'Capacitive', active: sensor_store.capacitive_sensor.state ?? data.capacitiveSensor },
+    { name: 'Pos Inner', active: sensor_store.position_inner_sensor.state ?? data.positionInnerSensor },
+    { name: 'Pos Outer', active: sensor_store.position_outer_sensor.state ?? data.positionOuterSensor },
   ];
 
   return (

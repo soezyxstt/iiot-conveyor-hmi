@@ -7,12 +7,12 @@ import { RelayStatus } from '@/components/monitoring/relay-status';
 import { Card } from '@/components/ui/card';
 
 // --- TAMBAHAN BARU ---
+import { conveyorLogs } from '@/db/schema'; // Pastikan path ke schema.ts benar
 import { type InferSelectModel } from 'drizzle-orm';
-import { machineLogs } from '@/db/schema'; // Pastikan path ke schema.ts benar
 
 // Ini akan otomatis mengambil tipe data sesuai kolom database kamu!
 // Tidak perlu ngetik manual satu-satu.
-type MachineData = InferSelectModel<typeof machineLogs>;
+type MachineData = InferSelectModel<typeof conveyorLogs>;
 // ---------------------
 
 export function MonitoringTab() {

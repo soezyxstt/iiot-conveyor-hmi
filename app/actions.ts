@@ -1,16 +1,16 @@
 'use server';
 
 import { db } from '@/db';
-import { machineLogs } from '@/db/schema';
-import { desc } from 'drizzle-orm';
+import { conveyorLogs } from '@/db/schema';
+import { desc, and, gte, lte } from 'drizzle-orm';
 
 // 1. Fungsi Ambil Data (Yang sudah ada sebelumnya)
 export async function getLatestData() {
   try {
     const data = await db
       .select()
-      .from(machineLogs)
-      .orderBy(desc(machineLogs.createdAt))
+      .from(conveyorLogs)
+      .orderBy(desc(conveyorLogs.createdAt))
       .limit(1);
     
     return data[0] || null;
@@ -25,8 +25,8 @@ export async function getHistoryData(limit = 50) {
   try {
     const data = await db
       .select()
-      .from(machineLogs)
-      .orderBy(desc(machineLogs.createdAt))
+      .from(conveyorLogs)
+      .orderBy(desc(conveyorLogs.createdAt))
       .limit(limit);
     
     return data.reverse();
@@ -36,8 +36,12 @@ export async function getHistoryData(limit = 50) {
   }
 }
 
-// 3. Fungsi Kirim Perintah (INI YANG HILANG DAN BIKIN ERROR)
+// 3. Fungsi Kirim Perintah
+// 3. Fungsi Kirim Perintah (DEPRECATED: Now using MQTT via Client)
 export async function sendCommand(updates: any) {
+  console.warn("sendCommand is deprecated. Use MQTT publish from client instead.");
+  return { success: false, message: "Deprecated" };
+  /*
   try {
     // Ambil state terakhir mesin biar data sensor lain gak hilang
     const latest = await getLatestData();
@@ -45,9 +49,9 @@ export async function sendCommand(updates: any) {
     if (!latest) return { success: false, message: "No data found" };
 
     // Insert baris baru: Data Lama + Update Baru dari Tombol
-    await db.insert(machineLogs).values({
+    await db.insert(conveyorLogs).values({
       ...latest,      // Copy semua field lama
-      ...updates,     // Timpa field yang diubah (misal: la1Forward: true)
+      ...updates,     // Timpa field yang diubah
       id: undefined,  // Biar database generate ID baru
       createdAt: undefined // Biar database generate waktu baru
     });
@@ -57,26 +61,22 @@ export async function sendCommand(updates: any) {
     console.error("Failed to send command:", error);
     return { success: false };
   }
+  */
 }
-
-// ... imports yang sudah ada
-import { and, gte, lte } from 'drizzle-orm'; // Pastikan import ini ada
-
-// ... fungsi getLatestData & sendCommand ...
 
 // FUNGSI BARU: Ambil data berdasarkan rentang waktu
 export async function getFilteredLogs(startDate: Date, endDate: Date) {
   try {
     const data = await db
       .select()
-      .from(machineLogs)
+      .from(conveyorLogs)
       .where(
         and(
-          gte(machineLogs.createdAt, startDate), // Greater Than or Equal (>= Start)
-          lte(machineLogs.createdAt, endDate)    // Less Than or Equal (<= End)
+          gte(conveyorLogs.createdAt, startDate), // Greater Than or Equal (>= Start)
+          lte(conveyorLogs.createdAt, endDate)    // Less Than or Equal (<= End)
         )
       )
-      .orderBy(desc(machineLogs.createdAt)); // Urutkan dari yang terbaru
+      .orderBy(desc(conveyorLogs.createdAt)); // Urutkan dari yang terbaru
     
     // Kita reverse biar di grafik urut dari Kiri (Lama) ke Kanan (Baru)
     return data.reverse();

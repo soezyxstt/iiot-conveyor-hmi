@@ -19,8 +19,9 @@ const create_initial_conveyor = (conveyor_id: number): ConveyorState => ({
   conveyor_id,
   direction: 'CW' as const,
   angle_deg: 0,
-  position: 0,
-  speed_rpm: 0,
+  motorSpeedSensor: 0,
+  objectCount: 0,
+  is_running: false, // New field for boolean stepper state
   timestamp: new Date().toISOString(),
 });
 
@@ -51,14 +52,22 @@ export const useConveyorStore = create<ConveyorStoreState>()(
 
       const animate = () => {
         const current_timestamp = Date.now();
-        const delta_time = (current_timestamp - last_timestamp) / 1000; // Convert to seconds
+        const delta_time = (current_timestamp - last_timestamp) / 1000;
         last_timestamp = current_timestamp;
 
         set((store) => {
-          // Calculate angle change based on RPM and delta time
-          // RPM * 6 = degrees per second (60 seconds = 360 degrees)
-          const outer_angle_change = (store.outer_conveyor.speed_rpm * 6 * delta_time) % 360;
-          const inner_angle_change = (store.inner_conveyor.speed_rpm * 6 * delta_time) % 360;
+          // Determine speed: Use sensor value if > 0, else default to 60 if is_running is true.
+          // This ensures animation works even if only boolean state is available.
+          const getSpeed = (c: ConveyorState) => {
+             if (c.motorSpeedSensor > 0) return c.motorSpeedSensor;
+             return c.is_running ? 60 : 0;
+          };
+
+          const outer_speed = getSpeed(store.outer_conveyor);
+          const inner_speed = getSpeed(store.inner_conveyor);
+
+          const outer_angle_change = (outer_speed * 6 * delta_time) % 360;
+          const inner_angle_change = (inner_speed * 6 * delta_time) % 360;
 
           const new_outer_angle = 
             store.outer_conveyor.direction === 'CW'
