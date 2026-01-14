@@ -7,7 +7,7 @@ import { useConveyorStore } from '@/store/conveyor-store';
 import { useSensorStore } from '@/store/sensor-store';
 
 // Kita terima data dari parent (MonitoringTab)
-export function RelayStatus({ data }: { data: any }) {
+export function RelayStatus() {
 
   const actuator_store = useActuatorStore();
   const conveyor_store = useConveyorStore();
@@ -16,21 +16,21 @@ export function RelayStatus({ data }: { data: any }) {
   // Create relay list merging Real-time Store (Priority) with DB Data (Fallback)
   const relayList = [
     // Actuators (DL/LD)
-    { name: 'DL Push', active: actuator_store.dl_actuator.push ?? data.dlPush },
-    { name: 'DL Pull', active: actuator_store.dl_actuator.pull ?? data.dlPull },
-    { name: 'LD Push', active: actuator_store.ld_actuator.push ?? data.ldPush },
-    { name: 'LD Pull', active: actuator_store.ld_actuator.pull ?? data.ldPull },
+    { name: 'DL Push', active: actuator_store.dl_actuator.push },
+    { name: 'DL Pull', active: actuator_store.dl_actuator.pull },
+    { name: 'LD Push', active: actuator_store.ld_actuator.push },
+    { name: 'LD Pull', active: actuator_store.ld_actuator.pull },
     
     // Steppers
-    { name: 'Stepper Inner', active: conveyor_store.inner_conveyor.is_running ?? data.stepperInnerRotate },
-    { name: 'Stepper Outer', active: conveyor_store.outer_conveyor.is_running ?? data.stepperOuterRotate },
+    { name: 'Stepper Inner', active: conveyor_store.inner_conveyor.is_running },
+    { name: 'Stepper Outer', active: conveyor_store.outer_conveyor.is_running },
     
     // Sensors
-    { name: 'IR Sensor', active: sensor_store.ir_sensor.state ?? data.irSensor },
-    { name: 'Inductive', active: sensor_store.inductive_sensor.state ?? data.inductiveSensor },
-    { name: 'Capacitive', active: sensor_store.capacitive_sensor.state ?? data.capacitiveSensor },
-    { name: 'Pos Inner', active: sensor_store.position_inner_sensor.state ?? data.positionInnerSensor },
-    { name: 'Pos Outer', active: sensor_store.position_outer_sensor.state ?? data.positionOuterSensor },
+    { name: 'IR Sensor', active: sensor_store.ir_sensor.state },
+    { name: 'Inductive', active: sensor_store.inductive_sensor.state },
+    { name: 'Capacitive', active: sensor_store.capacitive_sensor.state },
+    { name: 'Pos Inner', active: sensor_store.position_inner_sensor.state },
+    { name: 'Pos Outer', active: sensor_store.position_outer_sensor.state },
   ];
 
   return (

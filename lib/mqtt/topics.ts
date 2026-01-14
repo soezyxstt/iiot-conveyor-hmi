@@ -27,6 +27,15 @@ export const MQTT_TOPICS = {
   STEPPER_INNER: `${PREFIX}/conveyor/actuator/stepper/inner`,
   STEPPER_OUTER: `${PREFIX}/conveyor/actuator/stepper/outer`,
   
+  // Stepper Speeds
+  STEPPER_SPEED_1: `${PREFIX}/conveyor/actuator/stepper/speed1`,
+  STEPPER_SPEED_2: `${PREFIX}/conveyor/actuator/stepper/speed2`,
+  STEPPER_SPEED_3: `${PREFIX}/conveyor/actuator/stepper/speed3`,
+  STEPPER_SPEED_4: `${PREFIX}/conveyor/actuator/stepper/speed4`,
+  
+  // Feedback from Sensor about currently applied speed
+  STEPPER_SPEED_SENSOR: `${PREFIX}/conveyor/sensor/stepper/speed`,
+  
   // --- SYSTEM STATUS ---
   MQTT_STATUS: `${PREFIX}/conveyor/mqtt_status`,
 
@@ -46,6 +55,10 @@ export const MQTT_TOPICS = {
   WEB_CONTROL_DL_PULL: 'from_web/conveyor/actuator/DL/pull',
   WEB_CONTROL_LD_PUSH: 'from_web/conveyor/actuator/LD/push',
   WEB_CONTROL_LD_PULL: 'from_web/conveyor/actuator/LD/pull',
+
+  // --- AUTOMATION MODE ---
+  CONVEYOR_MODE_AUTOMATE: `${PREFIX}/conveyor/mode/automate`,
+  CONVEYOR_MODE_MANUAL: `${PREFIX}/conveyor/mode/manual`,
 } as const;
 
 // All topics for subscription
@@ -56,6 +69,10 @@ export const SUBSCRIBE_TOPICS: string[] = [
   MQTT_TOPICS.POSITION_INNER_SENSOR,
   MQTT_TOPICS.POSITION_OUTER_SENSOR,
   MQTT_TOPICS.MOTOR_SPEED_SENSOR,
+  
+  MQTT_TOPICS.STEPPER_SPEED_SENSOR, // New Subscription
+  MQTT_TOPICS.CONVEYOR_MODE_AUTOMATE,
+
   MQTT_TOPICS.OBJECT_INNER_COUNT,
   MQTT_TOPICS.OBJECT_OUTER_COUNT,
 

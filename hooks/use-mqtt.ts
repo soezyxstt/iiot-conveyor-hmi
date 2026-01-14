@@ -103,8 +103,6 @@ export function useMQTT(): UseMqttReturn {
 
       // --- SYSTEM STATUS (Online/Offline) ---
       if (topic === MQTT_TOPICS.MQTT_STATUS) {
-        // user said [2] is connected, [1] is connecting.
-        // We map to our status.
         system_store.set_mqtt_online_status(payload.status ?? 0);
         return;
       }
@@ -142,11 +140,29 @@ export function useMQTT(): UseMqttReturn {
       }
       if (topic === MQTT_TOPICS.POSITION_INNER_SENSOR) {
         sensor_store.update_boolean_sensor('position_inner', payload.state);
+        // Reset Inner Conveyor Position if sensor triggered
+        if (payload.state) {
+           conveyor_store.reset_conveyor_angle(2);
+        }
         return;
       }
       if (topic === MQTT_TOPICS.POSITION_OUTER_SENSOR) {
         sensor_store.update_boolean_sensor('position_outer', payload.state);
+        // Reset Outer Conveyor Position if sensor triggered
+         if (payload.state) {
+           conveyor_store.reset_conveyor_angle(1);
+        }
         return;
+      }
+      
+      // --- STEPPER SPEED FEEDBACK ---
+      if (topic === MQTT_TOPICS.STEPPER_SPEED_SENSOR) {
+         // Payload likely: {"StepperSpeed" : [ 3 ]} or just value [3]
+         // Handle both depending on parsing
+         if (typeof payload.value === 'number') {
+            system_store.set_speed_level(payload.value);
+         }
+         return;
       }
 
       // --- SENSORS (Data) ---
@@ -202,6 +218,16 @@ export function useMQTT(): UseMqttReturn {
         system_store.set_speed_level(payload.speed_level);
         return;
       }
+      
+      // --- AUTOMATE MODE ---
+      if (topic === MQTT_TOPICS.CONVEYOR_MODE_AUTOMATE) {
+        // Payload expected: { "AutomateMode": [ true/false ] }
+        // Parsed as payload.state or payload.value if normalized
+        const isAutomate = payload.state === true || payload.value === true;
+        conveyor_store.set_automate_mode(isAutomate);
+        return;
+      }
+
       if (topic === MQTT_TOPICS.POWER_ELECTRICITY) {
         system_store.set_electricity_status(payload.status);
         return;

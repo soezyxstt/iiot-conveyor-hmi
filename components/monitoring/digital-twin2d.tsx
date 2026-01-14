@@ -6,7 +6,7 @@ import { useSensorStore } from '@/store/sensor-store';
 import { useActuatorStore } from '@/store/actuator-store';
 import { useConveyorStore } from '@/store/conveyor-store';
 
-export function DigitalTwin2D({ data }: { data: any }) {
+export function DigitalTwin2D() {
   // Use PLC Store for Points (Real-time MQTT fallback)
   const outer_points_store = usePlcStore((s) => s.outer_points);
   const inner_points_store = usePlcStore((s) => s.inner_points);
@@ -16,36 +16,33 @@ export function DigitalTwin2D({ data }: { data: any }) {
   const actuator_store = useActuatorStore();
   const conveyor_store = useConveyorStore();
 
-  // 1. Loading State
-  if (!data) {
-    return (
-      <div className="w-full h-[500px] bg-gray-50 dark:bg-gray-800 rounded-lg border flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-500">Connecting to Digital Twin...</p>
-        </div>
-      </div>
-    );
-  }
+  // Actuator States
+  const la1_state = actuator_store.dl_actuator;
+  const la2_state = actuator_store.ld_actuator;
+
+  // 1. Loading State (Removed as we rely on real-time stores now)
 
   // 2. LOGIKA ANIMASI ROTASI (Hybrid System)
   const [visualOuterAngle, setVisualOuterAngle] = useState(0);
   const [visualInnerAngle, setVisualInnerAngle] = useState(0);
+  const [la1Extension, setLa1Extension] = useState(0); // 0 to 40
+  const [la2Extension, setLa2Extension] = useState(0); // 0 to 40
   const lastTimeRef = useRef<number>(0);
   const requestRef = useRef<number>(0);
 
-  // Data Mapping (Prioritize Store > DB Data)
+  // Data Mapping (Prioritize Store)
   // Use is_running from conveyor store for logic
   const outerRunning = conveyor_store.outer_conveyor.is_running;
   const innerRunning = conveyor_store.inner_conveyor.is_running;
 
-  const outerSpeedVal = sensor_store.motor_speed ?? data.motorSpeedSensor ?? 0;
+  const outerSpeedVal = sensor_store.motor_speed ?? 0;
 
   // Logic: If running, use speed val (or default 60), else 0
   const outerRpm = outerRunning ? (outerSpeedVal > 0 ? outerSpeedVal : 60) : 0;
 
   // Inner uses a similar logic, assuming we might get a speed or default
-  const innerRpmVal = data.stepperSpeedSetting || 0;
+  // Just defaulting to 60 if running for now as we don't have a distinct inner speed sensor in store yet
+  const innerRpmVal = 0; // Placeholder if there's no specific inner speed sensor
   const innerRpm = innerRunning ? (innerRpmVal > 0 ? innerRpmVal : 60) : 0;
 
   // --- SYNC POSISI SAAT DIAM ---
@@ -65,6 +62,37 @@ export function DigitalTwin2D({ data }: { data: any }) {
         setVisualOuterAngle((prev) => (prev + outerSpeedDeg * deltaTime) % 360);
         setVisualInnerAngle((prev) => (prev + innerSpeedDeg * deltaTime) % 360);
       }
+
+      // Linear Actuator Animation Logic
+      // Stroke 100mm = 40 units => 1mm = 0.4 units.
+      // Speed 10mm/s = 4 units/s.
+      const STROKE_PIXELS = 40;
+      const SPEED_PIXELS_S = 4;
+
+      // LA1 Logic
+      let dir1 = 0;
+      if (la1_state.push && !la1_state.pull) dir1 = 1;
+      else if (!la1_state.push && la1_state.pull) dir1 = -1;
+
+      if (dir1 !== 0) {
+        setLa1Extension((prev) => {
+          const next = prev + dir1 * SPEED_PIXELS_S * deltaTime;
+          return Math.max(0, Math.min(next, STROKE_PIXELS));
+        });
+      }
+
+      // LA2 Logic
+      let dir2 = 0;
+      if (la2_state.push && !la2_state.pull) dir2 = 1;
+      else if (!la2_state.push && la2_state.pull) dir2 = -1;
+
+      if (dir2 !== 0) {
+        setLa2Extension((prev) => {
+          const next = prev + dir2 * SPEED_PIXELS_S * deltaTime;
+          return Math.max(0, Math.min(next, STROKE_PIXELS));
+        });
+      }
+
     }
     lastTimeRef.current = time;
     requestRef.current = requestAnimationFrame(animate);
@@ -73,17 +101,18 @@ export function DigitalTwin2D({ data }: { data: any }) {
   useEffect(() => {
     requestRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(requestRef.current!);
-  }, [outerRpm, innerRpm]);
+  }, [outerRpm, innerRpm, la1_state.push, la1_state.pull, la2_state.push, la2_state.pull]); // Re-bind when states change to capture new closures
 
   // 3. PREPARE DATA (Mapping dari DB ke Visual)
   // Real-time Actuators
-  const relay_actuator_1 = actuator_store.dl_actuator.push || data.dlPush;
-  const relay_actuator_2 = actuator_store.ld_actuator.push || data.ldPush;
+  // Real-time Actuators (For color mainly)
+  const relay_actuator_1 = la1_state.push;
+  const relay_actuator_2 = la2_state.push;
 
   // Real-time Sensors
-  const relay_ir = sensor_store.ir_sensor.state || data.irSensor;
-  const relay_inductive = sensor_store.inductive_sensor.state || data.inductiveSensor;
-  const relay_capacitive = sensor_store.capacitive_sensor.state || data.capacitiveSensor;
+  const relay_ir = sensor_store.ir_sensor.state;
+  const relay_inductive = sensor_store.inductive_sensor.state;
+  const relay_capacitive = sensor_store.capacitive_sensor.state;
 
   // Map Store Points to Visual Array
   const outer_points = [1, 2, 3, 4, 5].map(id => {
@@ -167,9 +196,18 @@ export function DigitalTwin2D({ data }: { data: any }) {
           {/* Linear Actuator 1 (DL) */}
           <g>
             <rect x={CENTER_X - OUTER_RADIUS - LA_LENGTH / 2} y={CENTER_Y - 8} width={LA_LENGTH} height={16} fill={relay_actuator_1 ? '#7c3aed' : '#9ca3af'} stroke={relay_actuator_1 ? '#5b21b6' : '#6b7280'} strokeWidth="3" rx="4" />
-            <rect x={relay_actuator_1 ? (CENTER_X - OUTER_RADIUS + 10) : (CENTER_X - OUTER_RADIUS - LA_LENGTH / 2 + 10)} y={CENTER_Y - 12} width={24} height={24} fill={relay_actuator_1 ? '#c4b5fd' : '#d1d5db'} stroke={relay_actuator_1 ? '#5b21b6' : '#6b7280'} strokeWidth="3" rx="3">
-              {relay_actuator_1 && <animate attributeName="x" values={`${CENTER_X - OUTER_RADIUS - LA_LENGTH / 2 + 10};${CENTER_X - OUTER_RADIUS + 10};${CENTER_X - OUTER_RADIUS - LA_LENGTH / 2 + 10}`} dur="2s" repeatCount="indefinite" />}
-            </rect>
+
+            {/* Moving Head */}
+            <rect
+              x={(CENTER_X - OUTER_RADIUS - LA_LENGTH / 2 + 10) + la1Extension}
+              y={CENTER_Y - 12}
+              width={24}
+              height={24}
+              fill={relay_actuator_1 ? '#c4b5fd' : '#d1d5db'}
+              stroke={relay_actuator_1 ? '#5b21b6' : '#6b7280'}
+              strokeWidth="3"
+              rx="3"
+            />
             <text x={CENTER_X - OUTER_RADIUS - LA_LENGTH / 2 - 10} y={CENTER_Y + 5} textAnchor="end" className="text-[11px] fill-current font-semibold">LA1</text>
           </g>
 
@@ -192,9 +230,18 @@ export function DigitalTwin2D({ data }: { data: any }) {
           {/* Linear Actuator 2 (LD) */}
           <g>
             <rect x={CENTER_X + INNER_RADIUS - LA_LENGTH / 2} y={CENTER_Y - 8} width={LA_LENGTH} height={16} fill={relay_actuator_2 ? '#7c3aed' : '#9ca3af'} stroke={relay_actuator_2 ? '#5b21b6' : '#6b7280'} strokeWidth="3" rx="4" />
-            <rect x={relay_actuator_2 ? (CENTER_X + INNER_RADIUS + 10) : (CENTER_X + INNER_RADIUS - LA_LENGTH / 2 + 10)} y={CENTER_Y - 12} width={24} height={24} fill={relay_actuator_2 ? '#c4b5fd' : '#d1d5db'} stroke={relay_actuator_2 ? '#5b21b6' : '#6b7280'} strokeWidth="3" rx="3">
-              {relay_actuator_2 && <animate attributeName="x" values={`${CENTER_X + INNER_RADIUS - LA_LENGTH / 2 + 10};${CENTER_X + INNER_RADIUS + 10};${CENTER_X + INNER_RADIUS - LA_LENGTH / 2 + 10}`} dur="2s" repeatCount="indefinite" />}
-            </rect>
+
+            {/* Moving Head */}
+            <rect
+              x={(CENTER_X + INNER_RADIUS - LA_LENGTH / 2 + 10) + la2Extension}
+              y={CENTER_Y - 12}
+              width={24}
+              height={24}
+              fill={relay_actuator_2 ? '#c4b5fd' : '#d1d5db'}
+              stroke={relay_actuator_2 ? '#5b21b6' : '#6b7280'}
+              strokeWidth="3"
+              rx="3"
+            />
             <text x={CENTER_X + INNER_RADIUS + LA_LENGTH / 2 + 10} y={CENTER_Y + 5} textAnchor="start" className="text-[11px] fill-current font-semibold">LA2</text>
           </g>
 
@@ -219,29 +266,20 @@ export function DigitalTwin2D({ data }: { data: any }) {
 
       {/* --- BAGIAN 2: STATISTIK & LEGEND (SIDEBAR) --- */}
       <div className="w-full xl:w-1/3 space-y-4 flex flex-col">
-        
-        {/* Legend */}
-        <div className="bg-gray-100 dark:bg-gray-900 p-4 rounded-lg border border-gray-300 dark:border-gray-700">
-          <h3 className="font-semibold mb-3 text-gray-700 dark:text-gray-300">Legend</h3>
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <LegendItem color="bg-gray-600" label="Empty" />
-            <LegendItem color="bg-yellow-400" label="Occupied" />
-            <LegendItem color="bg-red-500" label="Metallic" />
-            <LegendItem color="bg-purple-600" label="Actuator" />
-            <LegendItem color="bg-blue-500" label="Inductive" />
-            <LegendItem color="bg-orange-500" label="IR Sensor" />
-          </div>
-        </div>
 
         {/* Statistics */}
         <div className="bg-gray-100 dark:bg-gray-900 p-4 rounded-lg border border-gray-300 dark:border-gray-700">
           <h3 className="font-semibold mb-3 text-gray-700 dark:text-gray-300">Object Count</h3>
           <div className="text-sm space-y-2">
-            <p>Outer Total: <b>{outer_points.filter(p => p.state !== 'empty').length}</b></p>
-            <p> - Metallic: <b className="text-red-500">{outer_points.filter(p => p.state === 'occupied_metallic').length}</b></p>
-            <p> - Non-metal: <b className="text-yellow-600">{outer_points.filter(p => p.state === 'occupied').length}</b></p>
+            <div className="flex justify-between items-center">
+              <span>Outer Total:</span>
+              <b className="text-lg">{sensor_store.object_outer_count}</b>
+            </div>
             <hr className="border-gray-300 dark:border-gray-700 my-2"/>
-            <p>Inner Total: <b>{inner_points.filter(p => p.state === 'occupied').length}</b></p>
+            <div className="flex justify-between items-center">
+              <span>Inner Total:</span>
+              <b className="text-lg">{sensor_store.object_inner_count}</b>
+            </div>
           </div>
         </div>
 
@@ -252,6 +290,8 @@ export function DigitalTwin2D({ data }: { data: any }) {
               <SensorStatusRow label="IR Sensor" active={relay_ir} />
               <SensorStatusRow label="Inductive" active={relay_inductive} />
               <SensorStatusRow label="Capacitive" active={relay_capacitive} />
+            <SensorStatusRow label="Proximity (Outer)" active={sensor_store.position_outer_sensor.state} />
+            <SensorStatusRow label="Proximity (Inner)" active={sensor_store.position_inner_sensor.state} />
            </div>
         </div>
 
@@ -261,14 +301,6 @@ export function DigitalTwin2D({ data }: { data: any }) {
 }
 
 // --- HELPER COMPONENTS ---
-function LegendItem({ color, label }: { color: string, label: string }) {
-  return (
-    <div className="flex items-center gap-2">
-      <div className={`w-4 h-4 rounded-full ${color} border border-gray-400`}></div>
-      <span className="text-gray-600 dark:text-gray-400">{label}</span>
-    </div>
-  )
-}
 
 function SensorStatusRow({ label, active }: { label: string, active: boolean }) {
   return (

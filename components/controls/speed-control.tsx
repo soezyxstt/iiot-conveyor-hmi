@@ -36,10 +36,27 @@ export function SpeedControl({ is_enabled = true }: SpeedControlProps) {
           value={[speed_level]}
           onValueChange={(value) => {
             set_speed_level(value[0]);
-            // Send command to MQTT
-            // Send command to MQTT
-            // TODO: Speed topic not found in new structure. Re-enable when confirmed.
-            // publish(MQTT_TOPICS.STEPPER_SPEED, { value: value[0] });
+
+            // New Logic: Publish to all 4 speed topics accordingly
+            // strict payload: {"StepperSpeed_X": [ true/false ]}
+
+            const targetLevel = value[0];
+            const speeds = [
+              { level: 1, topic: MQTT_TOPICS.STEPPER_SPEED_1, name: 'StepperSpeed_1' },
+              { level: 2, topic: MQTT_TOPICS.STEPPER_SPEED_2, name: 'StepperSpeed_2' },
+              { level: 3, topic: MQTT_TOPICS.STEPPER_SPEED_3, name: 'StepperSpeed_3' },
+              { level: 4, topic: MQTT_TOPICS.STEPPER_SPEED_4, name: 'StepperSpeed_4' },
+            ];
+
+            speeds.forEach((s) => {
+              // If slider is 0, ALL are false.
+              // If slider is N, only speedN is true.
+              const isActive = s.level === targetLevel;
+
+              publish(s.topic, {
+                [s.name]: [isActive]
+              });
+            });
           }}
           min={0}
           max={4}

@@ -52,7 +52,7 @@ export const useSystemStore = create<SystemStoreState>()(
     set_mode: (mode) => set({ mode }),
     
     set_speed_level: (level) => set({ 
-      speed_level: Math.max(1, Math.min(5, level)) 
+      speed_level: Math.max(0, Math.min(4, level)) 
     }),
     
     set_electricity_status: (status) => set({ electricity_status: status }),

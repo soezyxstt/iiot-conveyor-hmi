@@ -7,10 +7,13 @@ import type { ConveyorState, ConveyorDirection } from '@/types';
 interface ConveyorStoreState {
   outer_conveyor: ConveyorState;
   inner_conveyor: ConveyorState;
+  is_automate_mode_active: boolean;
   
   // Actions
   update_conveyor: (conveyor_id: number, data: Partial<ConveyorState>) => void;
   get_conveyor: (conveyor_id: number) => ConveyorState;
+  reset_conveyor_angle: (conveyor_id: number) => void;
+  set_automate_mode: (isActive: boolean) => void;
   start_animation_loop: () => void;
   stop_animation_loop: () => void;
 }
@@ -32,6 +35,9 @@ export const useConveyorStore = create<ConveyorStoreState>()(
   subscribeWithSelector((set, get) => ({
     outer_conveyor: create_initial_conveyor(1),
     inner_conveyor: create_initial_conveyor(2),
+    is_automate_mode_active: false,
+    
+    set_automate_mode: (isActive: boolean) => set({ is_automate_mode_active: isActive }),
     
     update_conveyor: (conveyor_id: number, data: Partial<ConveyorState>) =>
       set((store) => ({
@@ -46,6 +52,15 @@ export const useConveyorStore = create<ConveyorStoreState>()(
       const store = get();
       return conveyor_id === 1 ? store.outer_conveyor : store.inner_conveyor;
     },
+
+    reset_conveyor_angle: (conveyor_id: number) =>
+      set((store) => ({
+        [conveyor_id === 1 ? 'outer_conveyor' : 'inner_conveyor']: {
+          ...(conveyor_id === 1 ? store.outer_conveyor : store.inner_conveyor),
+          angle_deg: 0,
+          timestamp: new Date().toISOString(),
+        },
+      })),
 
     start_animation_loop: () => {
       if (animation_frame_id !== null) return;
