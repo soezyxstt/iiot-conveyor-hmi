@@ -1,108 +1,90 @@
-# Conveyor HMI - Next.js 16 Application
+# IIoT Conveyor HMI
 
-## Environment Setup
+Web-based human-machine interface for monitoring and controlling an industrial conveyor system in real time.
 
-Create a `.env.local` file in the project root:
+The application connects to MQTT infrastructure, visualizes machine state through a 2D digital twin, exposes operator controls, and provides diagnostic views for sensors, actuators, relays, and placing points.
+
+## Engineering highlights
+
+- Real-time MQTT communication between the browser and industrial system
+- 2D digital twin for conveyor and actuator state
+- Manual and automatic operating modes
+- Operator controls for conveyors, actuators, and speed settings
+- Live sensor, relay, and machine-status monitoring
+- Diagnostic tooling for system inspection and troubleshooting
+- Centralized client state using Zustand
+- Typed MQTT topic and payload definitions
+- Dark/light interface designed for HMI use
+
+## Stack
+
+- **Next.js 16**
+- **React + TypeScript**
+- **MQTT.js**
+- **Zustand**
+- **TanStack Query**
+- **Tailwind CSS / shadcn-style UI components**
+- **SVG** for the digital twin visualization
+
+## Architecture
+
+```text
+Machine / PLC
+     │
+     │ MQTT
+     ▼
+IIoT Broker ───────── Remote MQTT infrastructure
+     │
+     │ WebSocket MQTT
+     ▼
+Browser HMI
+ ├─ Monitoring
+ ├─ Controls
+ ├─ Diagnostics
+ └─ 2D Digital Twin
+```
+
+The broker used by this project is maintained separately:
+
+- [iiot-broker](https://github.com/soezyxstt/iiot-broker)
+
+## Environment setup
+
+Create `.env.local` in the project root:
 
 ```env
-# MQTT Configuration
-NEXT_PUBLIC_MQTT_BROKER_PROD=wss://broker.iot.hmmitb.com:8884
-NEXT_PUBLIC_MQTT_BROKER_DEV=ws://broker.iot.hmmitb.com:1884
-
-# Node Environment
+NEXT_PUBLIC_MQTT_BROKER_PROD=wss://your-production-broker
+NEXT_PUBLIC_MQTT_BROKER_DEV=ws://your-development-broker
 NODE_ENV=development
 ```
 
-## Project Structure
+Never commit production broker credentials or private connection details.
 
-```
-src/
-├── app/
-│   ├── layout.tsx                 # Root layout with providers
-│   ├── page.tsx                   # Main dashboard page
-│   ├── globals.css                # Global styles
-│   └── api/                       # API routes (if needed)
-├── components/
-│   ├── common/
-│   │   ├── navbar.tsx
-│   │   ├── status-indicator.tsx
-│   │   └── mqtt-status.tsx
-│   ├── monitoring/
-│   │   ├── placing-points-grid.tsx
-│   │   ├── digital-twin-2d.tsx
-│   │   ├── sensor-status.tsx
-│   │   └── relay-status.tsx
-│   ├── controls/
-│   │   ├── mode-selector.tsx
-│   │   ├── speed-control.tsx
-│   │   ├── actuator-controls.tsx
-│   │   └── conveyor-controls.tsx
-│   ├── diagnostics/
-│   │   ├── relay-toggle.tsx
-│   │   ├── placing-point-modifier.tsx
-│   │   └── system-logs.tsx
-│   └── ui/                        # shadcn/ui components
-├── hooks/
-│   ├── use-mqtt.ts
-│   ├── use-placing-points.ts
-│   ├── use-conveyor-state.ts
-│   ├── use-system-state.ts
-│   └── use-sensor-data.ts
-├── lib/
-│   ├── mqtt/
-│   │   ├── client.ts
-│   │   ├── topics.ts
-│   │   └── schemas.ts
-│   ├── constants/
-│   │   └── config.ts
-│   └── utils/
-│       └── helpers.ts
-├── store/
-│   ├── system-store.ts
-│   ├── plc-store.ts
-│   ├── conveyor-store.ts
-│   ├── sensor-store.ts
-│   └── actuator-store.ts
-└── types/
-    └── index.ts
-```
-
-## Installation & Deployment
-
-### Local Development
+## Local development
 
 ```bash
 npm install
 npm run dev
 ```
 
-### Vercel Deployment
+Then open the local Next.js development URL in a browser.
 
-1. Push your code to GitHub/GitLab
-2. Connect repository to Vercel
-3. Add environment variables:
-   - `NEXT_PUBLIC_MQTT_BROKER_PROD`
-   - `NEXT_PUBLIC_MQTT_BROKER_DEV`
-4. Deploy with `npm run build`
+## Main application areas
 
-### Key Features
+```text
+src/
+├── app/             # Routes and application shell
+├── components/
+│   ├── monitoring/  # Digital twin, sensors, status
+│   ├── controls/    # Conveyor, actuator, mode, speed controls
+│   ├── diagnostics/ # Relay and system diagnostics
+│   └── common/      # Shared HMI components
+├── hooks/           # MQTT and domain hooks
+├── lib/mqtt/        # Client, topics, schemas
+├── store/           # Zustand state stores
+└── types/           # Shared TypeScript types
+```
 
-- ✅ Real-time MQTT communication
-- ✅ 2D SVG-based digital twin
-- ✅ Three-tab interface (Monitoring, Controls, Diagnostics)
-- ✅ Light/Dark theme with HMI color standards
-- ✅ Zustand state management
-- ✅ TanStack Query for data syncing
-- ✅ TypeScript with strict types (no 'any')
-- ✅ Server components where possible
-- ✅ Vercel-ready (no Docker)
-- ✅ snake_case naming convention
+## Project context
 
-### Important Notes
-
-1. All client components have `'use client'` directive
-2. Follow HMI color standards for industrial applications
-3. Placing points: O1-O10 (outer), I1-I10 (inner)
-4. Relay mapping: R1-R2 (LA1), R3-R4 (LA2), R5-R7 (Sensors), R8-R9 (Motors)
-5. MQTT connection with exponential backoff retry
-6. All data types are strictly typed - no 'any' types allowed
+This project demonstrates a full web-to-machine IIoT workflow: MQTT transport, machine-state synchronization, industrial controls, diagnostics, and browser-based visualization.
