@@ -1,6 +1,7 @@
 {
-  "name": "hmi",
+  "name": "iiot-conveyor-hmi",
   "version": "0.1.0",
+  "description": "Browser-based industrial HMI for MQTT-connected conveyor monitoring and control",
   "private": true,
   "scripts": {
     "dev": "next dev",
